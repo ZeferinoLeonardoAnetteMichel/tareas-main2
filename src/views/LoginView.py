@@ -1,8 +1,7 @@
 import flet as ft
 
 def LoginView(page: ft.Page, auth_controller):
-    # --- LÓGICA DE PERFILES GUARDADOS ---
-    # Creamos una fila para mostrar los avatares de cuentas recientes
+
     fila_perfiles = ft.Row(
         scroll=ft.ScrollMode.ALWAYS,
         spacing=20,
@@ -11,9 +10,7 @@ def LoginView(page: ft.Page, auth_controller):
 
     def cargar_perfiles_locales():
         fila_perfiles.controls.clear()
-        # Intentamos obtener los perfiles del almacenamiento local
         try:
-            # Si client_storage falla, intenta con session_storage (depende de tu version)
             cuentas = page.client_storage.get("perfiles_activos") or []
         except:
             cuentas = []
@@ -22,11 +19,13 @@ def LoginView(page: ft.Page, auth_controller):
             fila_perfiles.controls.append(
                 ft.Column([
                     ft.Container(
-                        content=ft.Icon(ft.icons.PERSON, size=40, color="purple"),
-                        bgcolor=ft.colors.PURPLE_50,
-                        border_radius=30,
-                        padding=10,
-                        on_click=lambda _, c=cuenta: rellenar_campos(c)
+                        content=ft.CircleAvatar(
+                            foreground_image_url=cuenta.get('foto', 'assets/predeterminado.png'),
+                            content=ft.Icon(ft.icons.PERSON, size=30), 
+                            radius=30,
+                        ),
+                        on_click=lambda _, c=cuenta: rellenar_campos(c),
+                        tooltip=f"Entrar como {cuenta['nombre']}"
                     ),
                     ft.Text(cuenta['nombre'], size=12, weight="bold")
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
@@ -34,9 +33,9 @@ def LoginView(page: ft.Page, auth_controller):
 
     def rellenar_campos(datos):
         correo.value = datos.get('email', '')
+        contraseña.focus()
         page.update()
 
-    # --- CAMPOS DE TEXTO ---
     correo = ft.TextField(
         label="Correo electrónico",
         prefix_icon=ft.Icons.PERSON,
@@ -74,21 +73,21 @@ def LoginView(page: ft.Page, auth_controller):
             page.update()
             return
         
-        user, msg = auth_controller.login(correo.value, contraseña.value)
+        user, msg = auth_controller.login(correo.value, contraseña.value, page)
+        
         if user:
-            # --- GUARDAR EN "CUENTAS RECIENTES" (ESTILO FACEBOOK) ---
             try:
                 cuentas = page.client_storage.get("perfiles_activos") or []
-                # Si el usuario no está en la lista, lo agregamos
                 if not any(c['id'] == user['id_usuario'] for c in cuentas):
                     cuentas.append({
                         "id": user['id_usuario'],
                         "nombre": user['nombre'],
-                        "email": user['email']
+                        "email": user['email'],
+                        "foto": user.get('foto_perfil', 'assets/predeterminado.png') 
                     })
                     page.client_storage.set("perfiles_activos", cuentas)
             except Exception as ex:
-                print(f"Error guardando perfil: {ex}")
+                print(f"Error guardando perfil localmente: {ex}")
 
             page.user_data = user
             mostrar_snackbar("¡Sesión iniciada correctamente!", ft.Colors.GREEN)
@@ -117,7 +116,6 @@ def LoginView(page: ft.Page, auth_controller):
     
     contraseña.on_submit = login_click
 
-    # Cargar los perfiles antes de mostrar la vista
     cargar_perfiles_locales()
 
     return ft.View(
@@ -134,12 +132,6 @@ def LoginView(page: ft.Page, auth_controller):
                 [
                     ft.Text("Acceso al Sistema", size=35, weight="bold", color="purple"),
                     ft.Container(height=10),
-                    
-                    # --- MOSTRAR PERFILES RECIENTES ---
-                    ft.Text("Cuentas recientes", size=14, color="grey"),
-                    fila_perfiles,
-                    ft.Divider(height=30, color="transparent"),
-                    
                     correo,
                     ft.Container(height=10),
                     contraseña,
@@ -159,3 +151,5 @@ def LoginView(page: ft.Page, auth_controller):
             )
         ]
     )
+
+
